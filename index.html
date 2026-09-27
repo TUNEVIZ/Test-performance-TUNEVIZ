@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>TUNEVIZ渲染测试</title>
+<style>
+//注释
+/*注释
+注释*/
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0a0b10; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    color: #e8ecf4;
+    -webkit-font-smoothing: antialiased;
+  }
+  canvas { display: block; }
+
+  
+  #ui {
+    position: fixed; top: 14px; left: 14px; width: 210px;
+    padding: 12px 14px 14px; border-radius: 12px;
+    background: rgba(18, 20, 28, 0.74);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    font-size: 12.5px; z-index: 10; user-select: none;
+  }
+  #ui h1 {
+    font-size: 11px; font-weight: 600; letter-spacing: 1.2px;
+    text-transform: uppercase; color: #7f8ca8; margin-bottom: 10px;
+  }
+  .row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; padding: 4px 0;
+  }
+  .row span { color: #c3cbdb; }
+  input[type="checkbox"] {
+    appearance: none; -webkit-appearance: none;
+    width: 32px; height: 18px; border-radius: 9px; position: relative;
+    background: rgba(255, 255, 255, 0.12); cursor: pointer;
+    transition: background 0.2s ease; flex: none;
+  }
+  input[type="checkbox"]::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: #8b97ad; transition: transform 0.2s ease, background 0.2s ease;
+  }
+  input[type="checkbox"]:checked { background: rgba(76, 201, 240, 0.32); }
+  input[type="checkbox"]:checked::after { transform: translateX(14px); background: #4cc9f0; }
+
+  .slider { display: block; padding: 8px 0 2px; }
+  .slider .label {
+    display: flex; justify-content: space-between;
+    color: #c3cbdb; margin-bottom: 6px;
+  }
+  .slider .label b { color: #4cc9f0; font-weight: 500; font-variant-numeric: tabular-nums; }
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 4px; border-radius: 2px; outline: none;
+    background: rgba(255, 255, 255, 0.14); cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%;
+    background: #4cc9f0; box-shadow: 0 0 8px rgba(76, 201, 240, 0.6);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 13px; height: 13px; border: none; border-radius: 50%;
+    background: #4cc9f0;
+  }
+
+  
+  #stats {
+    position: fixed; top: 14px; right: 14px; padding: 10px 13px;
+    border-radius: 11px; min-width: 124px;
+    background: rgba(18, 20, 28, 0.74);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11.5px; line-height: 1.7; z-index: 10; user-select: none;
+  }
+  #stats .line { display: flex; justify-content: space-between; gap: 14px; }
+  #stats .k { color: #6f7c95; }
+  #stats .v { color: #e8ecf4; font-variant-numeric: tabular-nums; }
+  #stats .v.hi { color: #4cc9f0; }
+
+  #hint {
+    position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
+    font-size: 11.5px; color: rgba(200, 212, 232, 0.4);
+    letter-spacing: 0.4px; z-index: 10; pointer-events: none;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 560px) {
+    #ui { width: 176px; font-size: 12px; padding: 11px; }
+    #stats { font-size: 11px; min-width: 104px; padding: 8px 10px; }
+    #hint { font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+
+<div id="ui">
+  <h1>如果您能流畅运行，说明您的设备已足以运行TUNEVIZ！</h1>
+  <div class="row"><span>自动旋转</span><input type="checkbox" id="tgl-rotate" checked /></div>
+  <div class="row"><span>实时阴影</span><input type="checkbox" id="tgl-shadow" checked /></div>
+  <div class="row"><span>线框模式</span><input type="checkbox" id="tgl-wire" /></div>
+  <div class="row"><span>星空粒子</span><input type="checkbox" id="tgl-stars" checked /></div>
+  <label class="slider">
+    <span class="label"><span>曝光</span><b id="val-exposure">1.10</b></span>
+    <input type="range" id="rng-exposure" min="0.30" max="2.20" step="0.01" value="1.10" />
+  </label>
+</div>
+
+
+<div id="stats">
+  <div class="line"><span class="k">FPS</span><span class="v hi" id="stat-fps">--</span></div>
+  <div class="line"><span class="k">三角形</span><span class="v" id="stat-tris">--</span></div>
+  <div class="line"><span class="k">DrawCall</span><span class="v" id="stat-calls">--</span></div>
+</div>
+
+<div id="hint">拖拽旋转 · 滚轮缩放 · 右键平移</div>
+
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+
+const renderer = new THREE.WebGLRenderer({
+  antialias: true,
+  powerPreference: 'default',   
+  stencil: false,
+  depth: true
+});
+
+
+const DPR = Math.min(window.devicePixelRatio || 1, 1.5);
+renderer.setPixelRatio(DPR);
+renderer.setSize(window.innerWidth, window.innerHeight);
+
+
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFShadowMap;
+
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+
+
+document.body.appendChild(renderer.domElement);
+
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0b10);
+
+scene.fog = new THREE.Fog(0x0a0b10, 20, 55);
+
+const camera = new THREE.PerspectiveCamera(
+  45, window.innerWidth / window.innerHeight, 0.1, 200
+);
+camera.position.set(0, 7, 14);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.7, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.minDistance = 4;
+controls.maxDistance = 38;
+controls.maxPolarAngle = Math.PI * 0.495;
+controls.update();
+
+
+scene.add(new THREE.HemisphereLight(0x9db8ff, 0x0a0c14, 1.0));
+
+const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
+keyLight.position.set(6, 12, 7);
+keyLight.castShadow = true;
+
+
+keyLight.shadow.mapSize.set(1024, 1024);
+keyLight.shadow.camera.near = 1;
+keyLight.shadow.camera.far = 40;
+keyLight.shadow.camera.left = -12;
+keyLight.shadow.camera.right = 12;
+keyLight.shadow.camera.top = 12;
+keyLight.shadow.camera.bottom = -12;
+keyLight.shadow.bias = -0.0008;
+keyLight.shadow.normalBias = 0.03;
+scene.add(keyLight);
+
+
+const fillLight = new THREE.PointLight(0x4cc9f0, 60, 30, 2);
+scene.add(fillLight);
+
+
+const ground = new THREE.Mesh(
+  new THREE.CircleGeometry(17, 48),
+  new THREE.MeshStandardMaterial({
+    color: 0x101320,
+    roughness: 0.55,
+    metalness: 0.35
+  })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+
+const knot = new THREE.Mesh(
+  new THREE.TorusKnotGeometry(1.05, 0.33, 128, 24),
+  new THREE.MeshStandardMaterial({
+    color: 0xffb04d,
+    metalness: 0.75,
+    roughness: 0.25
+  })
+);
+knot.position.set(0, 2.6, 0);
+knot.castShadow = true;
+knot.receiveShadow = true;
+scene.add(knot);
+
+
+const shapeDefs = [
+  { geo: new THREE.BoxGeometry(1.1, 1.1, 1.1),          color: 0xff5f6d, metalness: 0.65, roughness: 0.25 },
+  { geo: new THREE.IcosahedronGeometry(0.82, 0),        color: 0x00d2ff, metalness: 0.25, roughness: 0.15 },
+  { geo: new THREE.CylinderGeometry(0.5, 0.5, 1.35, 20),color: 0x9d4edd, metalness: 0.45, roughness: 0.30 },
+  { geo: new THREE.SphereGeometry(0.78, 24, 16),        color: 0x06d6a0, metalness: 0.35, roughness: 0.20 }
+];
+
+const pivot = new THREE.Group();
+scene.add(pivot);
+
+const objects = [];
+const RADIUS = 3.9;
+const BASE_Y = 1.3;
+
+shapeDefs.forEach((def, i) => {
+  const angle = (i / shapeDefs.length) * Math.PI * 2;
+
+  const mesh = new THREE.Mesh(
+    def.geo,
+    new THREE.MeshStandardMaterial({
+      color: def.color,
+      metalness: def.metalness,
+      roughness: def.roughness
+    })
+  );
+  mesh.position.set(Math.cos(angle) * RADIUS, BASE_Y, Math.sin(angle) * RADIUS);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  pivot.add(mesh);
+
+  objects.push({
+    mesh,
+    baseY: BASE_Y,
+    phase: Math.random() * Math.PI * 2,
+    spinX: (Math.random() - 0.5) * 0.6,
+    spinY: 0.3 + Math.random() * 0.5
+  });
+});
+
+
+const STAR_COUNT = 320;
+const starPositions = new Float32Array(STAR_COUNT * 3);
+
+for (let i = 0; i < STAR_COUNT; i++) {
+  const r = 28 + Math.random() * 40;
+  const theta = Math.random() * Math.PI * 2;
+  const phi = Math.acos(2 * Math.random() - 1);
+
+  starPositions[i * 3 + 0] = r * Math.sin(phi) * Math.cos(theta);
+  starPositions[i * 3 + 1] = Math.abs(r * Math.cos(phi)) * 0.8 - 3;
+  starPositions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+}
+
+const starGeo = new THREE.BufferGeometry();
+starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+
+const stars = new THREE.Points(
+  starGeo,
+  new THREE.PointsMaterial({
+    color: 0x9db8ff,
+    size: 1.4,            
+    sizeAttenuation: false,
+    transparent: true,
+    opacity: 0.75,
+    depthWrite: false,
+    fog: false
+  })
+);
+scene.add(stars);
+
+
+function onResize() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+}
+window.addEventListener('resize', onResize);
+
+
+let autoRotate = true;
+
+document.getElementById('tgl-rotate').addEventListener('change', (e) => {
+  autoRotate = e.target.checked;
+});
+
+document.getElementById('tgl-shadow').addEventListener('change', (e) => {
+  renderer.shadowMap.enabled = e.target.checked;
+  renderer.shadowMap.needsUpdate = true;
+});
+
+document.getElementById('tgl-wire').addEventListener('change', (e) => {
+  const on = e.target.checked;
+  scene.traverse((o) => {
+    if (o.isMesh && o.material) {
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      mats.forEach((m) => { m.wireframe = on; });
+    }
+  });
+});
+
+document.getElementById('tgl-stars').addEventListener('change', (e) => {
+  stars.visible = e.target.checked;
+});
+
+const exposureRange = document.getElementById('rng-exposure');
+const exposureVal = document.getElementById('val-exposure');
+exposureRange.addEventListener('input', (e) => {
+  const v = parseFloat(e.target.value);
+  renderer.toneMappingExposure = v;
+  exposureVal.textContent = v.toFixed(2);
+});
+
+
+const fpsEl   = document.getElementById('stat-fps');
+const trisEl  = document.getElementById('stat-tris');
+const callsEl = document.getElementById('stat-calls');
+
+let frameCount = 0;
+let lastStatTime = performance.now();
+
+function updateStats() {
+  frameCount++;
+  const now = performance.now();
+  const delta = now - lastStatTime;
+
+  if (delta >= 500) {
+    fpsEl.textContent = Math.round((frameCount * 1000) / delta);
+    trisEl.textContent = renderer.info.render.triangles.toLocaleString('en-US');
+    callsEl.textContent = renderer.info.render.calls;
+    frameCount = 0;
+    lastStatTime = now;
+  }
+}
+
+
+const clock = new THREE.Clock();
+let elapsed = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const dt = Math.min(clock.getDelta(), 0.05);
+  elapsed += dt;
+
+  
+  if (autoRotate) {
+    pivot.rotation.y += dt * 0.20;
+  }
+
+  
+  knot.rotation.y += dt * 0.40;
+  knot.rotation.x = Math.sin(elapsed * 0.3) * 0.3;
+
+  
+  for (let i = 0; i < objects.length; i++) {
+    const o = objects[i];
+    o.mesh.rotation.x += dt * o.spinX;
+    o.mesh.rotation.y += dt * o.spinY;
+    o.mesh.position.y = o.baseY + Math.sin(elapsed * 1.0 + o.phase) * 0.14;
+  }
+
+  
+  const a = elapsed * 0.6;
+  fillLight.position.set(Math.cos(a) * 6, 3.4 + Math.sin(elapsed * 0.4) * 1.2, Math.sin(a) * 6);
+
+  
+  stars.rotation.y += dt * 0.006;
+
+  controls.update();
+  renderer.render(scene, camera);
+
+  updateStats();
+}
+
+animate();
+
+
+renderer.domElement.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();
+  console.warn('[RenderTest Lite] WebGL 上下文丢失');
+});
+renderer.domElement.addEventListener('webglcontextrestored', () => {
+  console.info('[RenderTest Lite] WebGL 上下文已恢复');
+});
+</script>
+</body>
+</html>
